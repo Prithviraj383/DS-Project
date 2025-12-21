@@ -14,7 +14,7 @@ char categories[MAX_CATEGORIES][20] = {
     "Cleanliness",
     "Other"
 };
-
+//extra comments
 /* -------------------- COMPLAINT STRUCT -------------------- */
 typedef struct {
     int id;
