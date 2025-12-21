@@ -74,8 +74,3 @@ This project implements a **Complaint Registration & Resolution System** that:
 - Mark complaints as resolved
 - Reopen the last resolved complaint
 - Simple menu-driven interface
-
----
-
-## 🧪 Sample Menu
-
