@@ -7,7 +7,7 @@
 #define MAX_CATEGORIES 5
 
 /* -------------------- CATEGORY ARRAY -------------------- */
-char categories[MAX_CATEGORIES][20] = { 
+char categories[MAX_CATEGORIES][20] = {
     "WiFi",
     "Electricity",
     "Plumbing",
@@ -21,8 +21,9 @@ typedef struct {
     char name[50];
     char room[10];
     int category;
+    int priority;        // 0 = Low, 1 = Medium, 2 = High
     char description[200];
-    int status;     // 0 = Pending, 1 = Resolved
+    int status;          // 0 = Pending, 1 = Resolved
 } Complaint;
 
 /* -------------------- LINKED LIST NODE -------------------- */
@@ -31,56 +32,59 @@ typedef struct Node {
     struct Node *next;
 } Node;
 
-/* Head and Tail pointers */
 Node *head = NULL;
 Node *tail = NULL;
 
-/* -------------------- QUEUE -------------------- */
+/* -------------------- QUEUE STRUCT -------------------- */
 typedef struct {
     int items[MAX_QUEUE];
     int front, rear;
 } Queue;
 
-/* -------------------- STACK -------------------- */
+/* -------------------- STACK STRUCT -------------------- */
 typedef struct {
     int items[MAX_STACK];
     int top;
 } Stack;
 
-Queue pendingQueue;
+/* Priority Queues */
+Queue highQ, mediumQ, lowQ;
 Stack resolvedStack;
 
 int ticketCounter = 1000;
 
 /* -------------------- FUNCTION DECLARATIONS -------------------- */
-void initQueue();
-void initStack();
+void initQueue(Queue *q);
+void initStack(Stack *s);
 
-void enqueue(int id);
-int dequeue();
+void enqueue(Queue *q, int id);
+int dequeue(Queue *q);
+int isQueueEmpty(Queue *q);
 
-void push(int id);
-int pop();
+void push(Stack *s, int id);
+int pop(Stack *s);
+
+int generateTicketID();
+Node* findComplaintByID(int id);
 
 void registerComplaint();
 void processNextComplaint();
 void reopenLastResolved();
 void displayAllComplaints();
 
-Node* findComplaintByID(int id);
-int generateTicketID();
-
 /* -------------------- MAIN -------------------- */
 int main() {
     int choice;
 
-    initQueue();
-    initStack();
+    initQueue(&highQ);
+    initQueue(&mediumQ);
+    initQueue(&lowQ);
+    initStack(&resolvedStack);
 
     do {
         printf("\n--- Campus Complaint Registration & Resolution System ---\n");
         printf("1. Register New Complaint\n");
-        printf("2. Process Next Pending Complaint\n");
+        printf("2. Process Next Complaint (Priority Based)\n");
         printf("3. Reopen Last Resolved Complaint\n");
         printf("4. View All Complaints\n");
         printf("0. Exit\n");
@@ -92,7 +96,7 @@ int main() {
             case 2: processNextComplaint(); break;
             case 3: reopenLastResolved(); break;
             case 4: displayAllComplaints(); break;
-            case 0: printf("Exiting system...\n"); break;
+            case 0: printf("Exiting...\n"); break;
             default: printf("Invalid choice!\n");
         }
     } while (choice != 0);
@@ -101,50 +105,48 @@ int main() {
 }
 
 /* -------------------- INITIALIZATION -------------------- */
-void initQueue() {
-    pendingQueue.front = pendingQueue.rear = -1;
+void initQueue(Queue *q) {
+    q->front = q->rear = -1;
 }
 
-void initStack() {
-    resolvedStack.top = -1;
+void initStack(Stack *s) {
+    s->top = -1;
 }
 
-/* -------------------- QUEUE FUNCTIONS -------------------- */
-void enqueue(int id) {
-    if (pendingQueue.rear == MAX_QUEUE - 1)
-        return;
+/* -------------------- QUEUE OPERATIONS -------------------- */
+void enqueue(Queue *q, int id) {
+    if (q->rear == MAX_QUEUE - 1) return;
 
-    if (pendingQueue.front == -1)
-        pendingQueue.front = 0;
+    if (q->front == -1)
+        q->front = 0;
 
-    pendingQueue.items[++pendingQueue.rear] = id;
+    q->items[++q->rear] = id;
 }
 
-int dequeue() {
-    if (pendingQueue.front == -1)
-        return -1;
+int dequeue(Queue *q) {
+    if (q->front == -1) return -1;
 
-    int id = pendingQueue.items[pendingQueue.front++];
+    int id = q->items[q->front++];
 
-    if (pendingQueue.front > pendingQueue.rear)
-        pendingQueue.front = pendingQueue.rear = -1;
+    if (q->front > q->rear)
+        q->front = q->rear = -1;
 
     return id;
 }
 
-/* -------------------- STACK FUNCTIONS -------------------- */
-void push(int id) {
-    if (resolvedStack.top == MAX_STACK - 1)
-        return;
-
-    resolvedStack.items[++resolvedStack.top] = id;
+int isQueueEmpty(Queue *q) {
+    return q->front == -1;
 }
 
-int pop() {
-    if (resolvedStack.top == -1)
-        return -1;
+/* -------------------- STACK OPERATIONS -------------------- */
+void push(Stack *s, int id) {
+    if (s->top == MAX_STACK - 1) return;
+    s->items[++s->top] = id;
+}
 
-    return resolvedStack.items[resolvedStack.top--];
+int pop(Stack *s) {
+    if (s->top == -1) return -1;
+    return s->items[s->top--];
 }
 
 /* -------------------- CORE LOGIC -------------------- */
@@ -152,7 +154,7 @@ int generateTicketID() {
     return ++ticketCounter;
 }
 
-/* FIFO insertion using tail pointer */
+/* FIFO Linked List Insertion */
 void registerComplaint() {
     Complaint c;
     c.id = generateTicketID();
@@ -166,8 +168,10 @@ void registerComplaint() {
     printf("Select Category:\n");
     for (int i = 0; i < MAX_CATEGORIES; i++)
         printf("%d. %s\n", i, categories[i]);
-
     scanf("%d", &c.category);
+
+    printf("Select Priority (0-Low, 1-Medium, 2-High): ");
+    scanf("%d", &c.priority);
 
     printf("Enter Description: ");
     scanf(" %[^\n]", c.description);
@@ -178,22 +182,36 @@ void registerComplaint() {
     newNode->data = c;
     newNode->next = NULL;
 
-    if (head == NULL) {
+    if (!head)
         head = tail = newNode;
-    } else {
+    else {
         tail->next = newNode;
         tail = newNode;
     }
 
-    enqueue(c.id);
+    /* Enqueue based on priority */
+    if (c.priority == 2)
+        enqueue(&highQ, c.id);
+    else if (c.priority == 1)
+        enqueue(&mediumQ, c.id);
+    else
+        enqueue(&lowQ, c.id);
 
     printf("Complaint registered successfully.\n");
     printf("Ticket ID: %d\n", c.id);
 }
 
+/* Priority-based processing */
 void processNextComplaint() {
-    int id = dequeue();
-    if (id == -1) {
+    int id;
+
+    if (!isQueueEmpty(&highQ))
+        id = dequeue(&highQ);
+    else if (!isQueueEmpty(&mediumQ))
+        id = dequeue(&mediumQ);
+    else if (!isQueueEmpty(&lowQ))
+        id = dequeue(&lowQ);
+    else {
         printf("No pending complaints.\n");
         return;
     }
@@ -201,13 +219,13 @@ void processNextComplaint() {
     Node *temp = findComplaintByID(id);
     if (temp) {
         temp->data.status = 1;
-        push(id);
+        push(&resolvedStack, id);
         printf("Complaint ID %d resolved.\n", id);
     }
 }
 
 void reopenLastResolved() {
-    int id = pop();
+    int id = pop(&resolvedStack);
     if (id == -1) {
         printf("No resolved complaints to reopen.\n");
         return;
@@ -216,7 +234,14 @@ void reopenLastResolved() {
     Node *temp = findComplaintByID(id);
     if (temp) {
         temp->data.status = 0;
-        enqueue(id);
+
+        if (temp->data.priority == 2)
+            enqueue(&highQ, id);
+        else if (temp->data.priority == 1)
+            enqueue(&mediumQ, id);
+        else
+            enqueue(&lowQ, id);
+
         printf("Complaint ID %d reopened.\n", id);
     }
 }
@@ -243,9 +268,11 @@ void displayAllComplaints() {
         printf("\nName: %s", temp->data.name);
         printf("\nRoom: %s", temp->data.room);
         printf("\nCategory: %s", categories[temp->data.category]);
-        printf("\nDescription: %s", temp->data.description);
+        printf("\nPriority: %s",
+            temp->data.priority == 2 ? "High" :
+            temp->data.priority == 1 ? "Medium" : "Low");
         printf("\nStatus: %s\n",
-               temp->data.status == 0 ? "Pending" : "RESOLVED");
+            temp->data.status == 0 ? "Pending" : "Resolved");
         temp = temp->next;
     }
 }
