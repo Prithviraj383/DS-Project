@@ -21,9 +21,9 @@ typedef struct {
     char name[50];
     char room[10];
     int category;
-    int priority;        // 0 = Low, 1 = Medium, 2 = High
+    int priority;        
     char description[200];
-    int status;          // 0 = Pending, 1 = Resolved
+    int status;          
 } Complaint;
 
 /* -------------------- LINKED LIST NODE -------------------- */
